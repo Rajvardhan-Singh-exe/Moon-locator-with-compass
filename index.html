@@ -1,387 +1,1089 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mode="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUNAR HUD v5.5</title>
-    <style>
-        :root {
-            --pure-black: #000000;
-            --dark-gray: #0b0b0d;
-            --hud-overlay: rgba(5, 5, 5, 0.95);
-            --neon-red: #ff4a4a;
-            --neon-green: #00ff66;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lunara — Universal Moon Position</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --serif: 'EB Garamond', Georgia, serif;
+  --sans: 'Inter', sans-serif;
+  --transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
+}
 
-        body {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: var(--pure-black);
-            color: #ffffff;
-            margin: 0;
-            overflow: hidden;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            position: relative;
-        }
+/* ── DARK MODE (default) ── */
+[data-mode="dark"] {
+  --bg-canvas: #0e1410;
+  --bg-panel: rgba(10,18,12,0.72);
+  --bg-panel-solid: #0e1a10;
+  --bg-glass: rgba(255,255,255,0.04);
+  --bg-glass-hover: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.22);
+  --text-primary: rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.52);
+  --text-muted: rgba(255,255,255,0.28);
+  --accent: #7eb87a;
+  --accent-dim: rgba(126,184,122,0.18);
+  --accent-glow: rgba(126,184,122,0.30);
+  --moon-fill: rgba(255,255,255,0.92);
+  --moon-stroke: rgba(255,255,255,0.6);
+  --above: #7eb87a;
+  --below: #c07a4a;
+  --shadow: 0 8px 40px rgba(0,0,0,0.6);
+  --sky-tint: rgba(126,184,122,0.06);
+  --ground-tint: rgba(30,50,20,0.5);
+  --bg-gradient: linear-gradient(to bottom, rgba(14,20,16,0.45) 0%, rgba(14,20,16,0.62) 100%);
+}
 
-        #star-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            pointer-events: none;
-        }
+/* ── LIGHT MODE ── */
+[data-mode="light"] {
+  --bg-canvas: #f0ede6;
+  --bg-panel: rgba(240,237,230,0.82);
+  --bg-panel-solid: #ede9e0;
+  --bg-glass: rgba(0,0,0,0.03);
+  --bg-glass-hover: rgba(0,0,0,0.06);
+  --border: rgba(0,0,0,0.10);
+  --border-strong: rgba(0,0,0,0.22);
+  --text-primary: rgba(22,30,18,0.92);
+  --text-secondary: rgba(22,30,18,0.52);
+  --text-muted: rgba(22,30,18,0.28);
+  --accent: #4a8c44;
+  --accent-dim: rgba(74,140,68,0.12);
+  --accent-glow: rgba(74,140,68,0.20);
+  --moon-fill: rgba(22,30,18,0.85);
+  --moon-stroke: rgba(22,30,18,0.5);
+  --above: #4a8c44;
+  --below: #9b5a28;
+  --shadow: 0 8px 40px rgba(0,0,0,0.14);
+  --sky-tint: rgba(74,140,68,0.05);
+  --ground-tint: rgba(60,40,20,0.08);
+  --bg-gradient: linear-gradient(to bottom, rgba(240,237,230,0.55) 0%, rgba(235,230,220,0.72) 100%);
+}
 
-        header {
-            width: 100%;
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            box-sizing: border-box;
-            z-index: 100;
-        }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
 
-        h1 {
-            margin: 0;
-            font-size: 1.2rem;
-            letter-spacing: 5px;
-            color: #ffffff;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
-        }
+body {
+  font-family: var(--sans);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: var(--transition);
+}
 
-        #status-text {
-            font-size: 0.75rem;
-            color: var(--neon-green);
-            margin-top: 8px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
+/* ── PAINTERLY BACKGROUND ── */
+.bg-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.bg-scene svg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* SVG painterly river landscape */
+.bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-gradient);
+  transition: var(--transition);
+}
 
-        #viewport-container {
-            position: relative;
-            width: 100%;
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-        }
+/* ── LAYOUT ── */
+.app {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-        #compass-hardware-frame {
-            position: relative;
-            width: 290px;
-            height: 290px;
-            background: rgba(11, 11, 13, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0,0,0,1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s ease-out; 
-            backdrop-filter: blur(4px);
-        }
+/* ── NAV ── */
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 2.5rem;
+  position: relative;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.logo-diamond {
+  width: 22px;
+  height: 22px;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--text-primary);
+  position: relative;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.logo-diamond::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--text-primary);
+  transition: var(--transition);
+}
+.logo-name {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  transition: var(--transition);
+}
+.nav-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  font-family: var(--serif);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  transition: var(--transition);
+}
+.nav-center strong { font-style: normal; font-weight: 500; }
+.nav-right { display: flex; align-items: center; gap: 12px; }
 
-        #inner-ticks {
-            position: absolute;
-            width: 85%;
-            height: 85%;
-            border: 1px dashed rgba(255, 255, 255, 0.05);
-            border-radius: 50%;
-        }
+/* Mode toggle */
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 100px;
+  transition: var(--transition);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.mode-btn:hover { background: var(--bg-glass-hover); }
+.mode-icon { font-size: 14px; }
 
-        .cardinal {
-            position: absolute;
-            font-weight: bold;
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 0.95rem;
-        }
-        .north { top: 12px; color: var(--neon-red); text-shadow: 0 0 5px var(--neon-red); }
-        .east { right: 12px; }
-        .south { bottom: 12px; }
-        .west { left: 12px; }
+/* Locate button */
+.locate-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--text-primary);
+  color: var(--bg-canvas);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  padding: 8px 18px 8px 16px;
+  cursor: pointer;
+  border: none;
+  border-radius: 100px;
+  transition: var(--transition);
+}
+.locate-btn:hover { opacity: 0.85; transform: scale(0.98); }
+.locate-arrow {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--bg-canvas);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  transition: var(--transition);
+}
 
-        #moon-indicator {
-            position: absolute;
-            width: 36px;
-            height: 36px;
-            font-size: 30px;
-            line-height: 36px;
-            text-align: center;
-            z-index: 50;
-            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.7));
-            pointer-events: none;
-        }
+/* ── DOT NAV ── */
+.dot-nav {
+  position: fixed;
+  left: 2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--text-secondary);
+  transform: rotate(45deg);
+  cursor: pointer;
+  transition: var(--transition);
+  background: transparent;
+}
+.dot.active {
+  border-color: var(--text-primary);
+  background: var(--text-primary);
+}
+.dot:hover { border-color: var(--text-primary); }
 
-        #hud-panel {
-            width: calc(100% - 40px);
-            max-width: 450px;
-            background: var(--hud-overlay);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 6px;
-            padding: 16px;
-            margin-bottom: 25px;
-            box-sizing: border-box;
-            z-index: 90;
-        }
+/* ── MAIN CONTENT ── */
+main {
+  flex: 1;
+  padding: 0 2.5rem 2.5rem;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
+/* ── GLASS PANEL ── */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  overflow: hidden;
+  transition: var(--transition);
+  box-shadow: var(--shadow);
+}
+.panel-section {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.panel-section:last-child { border-bottom: none; }
 
-        .telemetry-block {
-            border-left: 1px solid rgba(255, 255, 255, 0.15);
-            padding-left: 12px;
-        }
+.section-label {
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  transition: var(--transition);
+}
 
-        .label {
-            font-size: 0.65rem;
-            color: #55555c;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+/* ── SLIDERS ── */
+.field { margin-bottom: 1rem; }
+.field:last-child { margin-bottom: 0; }
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.field-name {
+  font-family: var(--serif);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+.field-val {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+  transition: var(--transition);
+}
+input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1px;
+  background: var(--border-strong);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  background: var(--text-primary);
+  border-radius: 0;
+  transform: rotate(45deg);
+  cursor: pointer;
+  transition: var(--transition);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px; height: 12px;
+  background: var(--text-primary);
+  border: none; border-radius: 0;
+  cursor: pointer;
+}
+.num-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.num-group label {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  transition: var(--transition);
+}
+input[type="number"], input[type="date"] {
+  width: 100%;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  border-radius: 2px;
+  transition: var(--transition);
+}
+input[type="number"]:focus, input[type="date"]:focus {
+  border-color: var(--accent);
+}
+input[type="date"] { color-scheme: dark; }
+[data-mode="light"] input[type="date"] { color-scheme: light; }
 
-        .value {
-            font-size: 1.05rem;
-            color: #ffffff;
-            font-weight: bold;
-            margin-top: 4px;
-            letter-spacing: 0.5px;
-        }
-    </style>
+/* ── CITY BUTTONS ── */
+.city-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.city-btn {
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--serif);
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: var(--transition);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.city-btn::before {
+  content: '◇';
+  font-size: 8px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.city-btn:hover, .city-btn.active {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-dim);
+}
+.city-btn.active::before { content: '◆'; color: var(--accent); }
+
+/* ── DATA CARDS ── */
+.data-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+.data-card {
+  background: var(--bg-panel);
+  padding: 1.25rem 1.5rem;
+  transition: var(--transition);
+}
+.data-card .dk {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  transition: var(--transition);
+}
+.data-card .dv {
+  font-family: var(--serif);
+  font-size: 36px;
+  font-weight: 400;
+  color: var(--text-primary);
+  line-height: 1;
+  transition: var(--transition);
+}
+.data-card .du {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  letter-spacing: 0.08em;
+  transition: var(--transition);
+}
+.data-card.wide {
+  grid-column: 1 / -1;
+}
+.above { color: var(--above) !important; }
+.below { color: var(--below) !important; }
+
+/* ── VIZ PANELS ── */
+.viz-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.viz-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+}
+.viz-label {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--text-primary);
+  margin-bottom: .35rem;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.viz-label-diamond {
+  width: 14px; height: 14px;
+  border: 1.5px solid var(--accent);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  position: relative;
+}
+.viz-sub {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+  transition: var(--transition);
+}
+canvas { display: block; width: 100%; height: auto; }
+
+/* ── STATUS ── */
+.status-bar {
+  margin-top: 1rem;
+  padding: .75rem 1.5rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: var(--transition);
+}
+.status-bar span { color: var(--text-secondary); }
+.pulse {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  margin-right: 8px;
+  animation: pulse 2.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+/* ── HERO TEXT ── */
+.hero-word {
+  position: fixed;
+  right: 2.5rem;
+  bottom: 3rem;
+  z-index: 2;
+  text-align: right;
+  pointer-events: none;
+}
+.hero-word h2 {
+  font-family: var(--serif);
+  font-size: clamp(56px, 7vw, 96px);
+  font-weight: 400;
+  color: var(--text-primary);
+  line-height: 1;
+  opacity: 0.85;
+  transition: var(--transition);
+}
+.hero-word p {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  transition: var(--transition);
+}
+
+/* ── GEO STATUS ── */
+.geo-status {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-top: 8px;
+  transition: var(--transition);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1024px) {
+  main { grid-template-columns: 1fr; }
+  .viz-row { grid-template-columns: 1fr; }
+  .hero-word { display: none; }
+}
+@media (max-width: 640px) {
+  nav { padding: 1rem 1.25rem; }
+  .nav-center { display: none; }
+  main { padding: 0 1.25rem 1.25rem; }
+  .dot-nav { display: none; }
+}
+</style>
 </head>
 <body>
 
-    <canvas id="star-canvas"></canvas>
+<!-- PAINTERLY BACKGROUND -->
+<div class="bg-scene">
+  <svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <filter id="painterly">
+        <feTurbulence type="fractalNoise" baseFrequency="0.025 0.018" numOctaves="5" seed="8" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+      <filter id="soft"><feGaussianBlur stdDeviation="1.2"/></filter>
+      <filter id="grain">
+        <feTurbulence type="turbulence" baseFrequency="0.75" numOctaves="2" seed="3" result="g"/>
+        <feColorMatrix type="saturate" values="0" in="g" result="gs"/>
+        <feBlend in="SourceGraphic" in2="gs" mode="multiply" result="blend"/>
+        <feComposite in="blend" in2="SourceGraphic" operator="in"/>
+      </filter>
+    </defs>
+    <!-- Deep forest base -->
+    <rect width="1440" height="900" fill="#1a2e14"/>
+    <!-- Meadow plateaus -->
+    <ellipse cx="200" cy="300" rx="420" ry="280" fill="#2d4a1e" filter="url(#painterly)"/>
+    <ellipse cx="900" cy="180" rx="580" ry="260" fill="#3a5a28" filter="url(#painterly)"/>
+    <ellipse cx="1300" cy="400" rx="360" ry="320" fill="#2a4018" filter="url(#painterly)"/>
+    <ellipse cx="600" cy="650" rx="300" ry="200" fill="#365224" filter="url(#painterly)"/>
+    <!-- Lighter grass patches -->
+    <ellipse cx="350" cy="200" rx="200" ry="120" fill="#4a7032" filter="url(#painterly)"/>
+    <ellipse cx="1100" cy="280" rx="260" ry="140" fill="#527836" filter="url(#painterly)"/>
+    <ellipse cx="820" cy="720" rx="380" ry="160" fill="#3e6028" filter="url(#painterly)"/>
+    <ellipse cx="100" cy="580" rx="180" ry="220" fill="#243c16" filter="url(#painterly)"/>
+    <!-- Yellow-green highlights -->
+    <ellipse cx="440" cy="140" rx="120" ry="70" fill="#6a9040" opacity="0.7" filter="url(#painterly)"/>
+    <ellipse cx="1020" cy="320" rx="90" ry="50" fill="#7aaa48" opacity="0.5" filter="url(#painterly)"/>
+    <ellipse cx="700" cy="800" rx="160" ry="60" fill="#6a9040" opacity="0.4" filter="url(#painterly)"/>
+    <!-- Main river - left winding -->
+    <path d="M 80 0 C 120 80, 60 160, 100 240 C 140 320, 200 340, 180 440 C 160 540, 80 580, 120 680 C 160 780, 200 840, 160 900" fill="none" stroke="#7aa8c8" stroke-width="72" filter="url(#painterly)" stroke-linecap="round"/>
+    <path d="M 80 0 C 120 80, 60 160, 100 240 C 140 320, 200 340, 180 440 C 160 540, 80 580, 120 680 C 160 780, 200 840, 160 900" fill="none" stroke="#8ec4e4" stroke-width="36" filter="url(#soft)" opacity="0.6"/>
+    <!-- White water rapids -->
+    <ellipse cx="130" cy="200" rx="28" ry="16" fill="#d4eaf8" opacity="0.7" filter="url(#painterly)"/>
+    <ellipse cx="95" cy="460" rx="22" ry="12" fill="#cce4f4" opacity="0.5" filter="url(#painterly)"/>
+    <!-- Right river tributary -->
+    <path d="M 640 0 C 660 100, 700 200, 680 320 C 660 440, 720 520, 700 640 C 680 760, 640 840, 660 900" fill="none" stroke="#6894ae" stroke-width="54" filter="url(#painterly)" stroke-linecap="round"/>
+    <path d="M 640 0 C 660 100, 700 200, 680 320 C 660 440, 720 520, 700 640 C 680 760, 640 840, 660 900" fill="none" stroke="#90bcd8" stroke-width="24" filter="url(#soft)" opacity="0.45"/>
+    <!-- Island / sandbar -->
+    <ellipse cx="148" cy="268" rx="22" ry="14" fill="#4a6030" filter="url(#painterly)"/>
+    <!-- Dark tree masses -->
+    <ellipse cx="50" cy="450" rx="90" ry="180" fill="#1a2e10" filter="url(#painterly)"/>
+    <ellipse cx="1380" cy="200" rx="120" ry="200" fill="#1e3412" filter="url(#painterly)"/>
+    <ellipse cx="800" cy="500" rx="80" ry="120" fill="#243c16" filter="url(#painterly)"/>
+    <!-- Subtle grain -->
+    <rect width="1440" height="900" fill="url(#grain)" opacity="0.12"/>
+  </svg>
+  <div class="bg-overlay"></div>
+</div>
 
-    <header>
-        <h1>LUNAR MATRIX LINK</h1>
-        <div id="status-text">RUNNING COMPUTE...</div>
-    </header>
+<!-- DOT NAVIGATION -->
+<nav class="dot-nav">
+  <div class="dot active" title="Controls"></div>
+  <div class="dot" title="Compass"></div>
+  <div class="dot" title="Horizon"></div>
+  <div class="dot" title="Data"></div>
+  <div class="dot" title="Info"></div>
+</nav>
 
-    <div id="viewport-container">
-        <div id="compass-hardware-frame">
-            <div id="inner-ticks"></div>
-            <div class="cardinal north">N</div>
-            <div class="cardinal east">E</div>
-            <div class="cardinal south">S</div>
-            <div class="cardinal west">W</div>
-            <div id="moon-indicator">🌑</div>
-        </div>
+<!-- HERO WORD -->
+<div class="hero-word">
+  <h2 id="heroWord">Moon</h2>
+  <p>Position Locator</p>
+</div>
+
+<div class="app">
+  <!-- NAV -->
+  <nav>
+    <a class="logo" href="#">
+      <div class="logo-diamond"></div>
+      <span class="logo-name">Lunara</span>
+    </a>
+    <div class="nav-center">
+      Made for<br><strong>EVERYone, EVERYwhere</strong>
     </div>
-
-    <div id="hud-panel">
-        <div class="grid">
-            <div class="telemetry-block">
-                <div class="label">Bearing (Azimuth)</div>
-                <div id="val-azimuth" class="value">0.0°</div>
-            </div>
-            <div class="telemetry-block">
-                <div class="label">Elevation (Altitude)</div>
-                <div id="val-altitude" class="value">0.0°</div>
-            </div>
-            <div class="telemetry-block">
-                <div class="label">Current Phase</div>
-                <div id="val-phase" class="value">Calculating...</div>
-            </div>
-            <div class="telemetry-block">
-                <div class="label">Orbital Distance</div>
-                <div id="val-distance" class="value">---,--- km</div>
-            </div>
-        </div>
+    <div class="nav-right">
+      <button class="mode-btn" id="modeBtn">
+        <span class="mode-icon" id="modeIcon">☀</span>
+        <span id="modeLabel">Light</span>
+      </button>
+      <button class="locate-btn" id="geoBtn">
+        <span>Locate me</span>
+        <span class="locate-arrow">↗</span>
+      </button>
     </div>
+  </nav>
 
-    <script>
-        let targetTrueBearing = 0;
-        
-        // Fail-safe default spatial metrics for Lucknow, India
-        const DEFAULT_LAT = 26.8467;
-        const DEFAULT_LON = 80.9462;
+  <!-- MAIN -->
+  <main>
+    <!-- SIDEBAR CONTROLS -->
+    <aside>
+      <div class="panel">
+        <!-- COORDINATES -->
+        <div class="panel-section">
+          <div class="section-label">Coordinates</div>
+          <div class="field">
+            <div class="field-row">
+              <span class="field-name">Latitude</span>
+              <span class="field-val" id="latVal">26.84°</span>
+            </div>
+            <input type="range" id="latSlider" min="-90" max="90" step="0.01" value="26.84">
+          </div>
+          <div class="field">
+            <div class="field-row">
+              <span class="field-name">Longitude</span>
+              <span class="field-val" id="lngVal">80.94°</span>
+            </div>
+            <input type="range" id="lngSlider" min="-180" max="180" step="0.01" value="80.94">
+          </div>
+          <div class="num-row">
+            <div class="num-group">
+              <label>Lat (manual)</label>
+              <input type="number" id="latNum" min="-90" max="90" step="0.0001" value="26.84">
+            </div>
+            <div class="num-group">
+              <label>Lng (manual)</label>
+              <input type="number" id="lngNum" min="-180" max="180" step="0.0001" value="80.94">
+            </div>
+          </div>
+          <div class="geo-status" id="geoStatus">Ready — awaiting location request</div>
+        </div>
 
-        window.addEventListener('DOMContentLoaded', () => {
-            initStars();
-            
-            // Execute fallback instantly so UI isn't stuck waiting for Geolocation response
-            runPrecisionUpdate(DEFAULT_LAT, DEFAULT_LON);
-            document.getElementById('status-text').innerText = "CORE ACTIVE // USING LUCKNOW METRICS";
+        <!-- TIME -->
+        <div class="panel-section">
+          <div class="section-label">Time</div>
+          <div class="field">
+            <div class="field-row">
+              <span class="field-name">UTC hour</span>
+              <span class="field-val" id="timeVal">00:00</span>
+            </div>
+            <input type="range" id="timeSlider" min="0" max="23.983" step="0.0167" value="0">
+          </div>
+          <div class="field" style="margin-top:.5rem">
+            <div class="num-group">
+              <label>Date</label>
+              <input type="date" id="dateInput">
+            </div>
+          </div>
+        </div>
 
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(
-                    (position) => {
-                        document.getElementById('status-text').innerText = "CORE ACTIVE // HARDWARE GPS SYNC";
-                        runPrecisionUpdate(position.coords.latitude, position.coords.longitude);
-                    },
-                    (error) => {
-                        // Fail silently and keep using default parameters
-                        console.log("GPS Denied, utilizing localized default coordinates.");
-                    },
-                    { enableHighAccuracy: true, timeout: 5000 }
-                );
-            }
+        <!-- CITIES -->
+        <div class="panel-section">
+          <div class="section-label">Quick cities</div>
+          <div class="city-grid">
+            <button class="city-btn active" data-lat="26.84" data-lng="80.94">Lucknow</button>
+            <button class="city-btn" data-lat="51.507" data-lng="-0.128">London</button>
+            <button class="city-btn" data-lat="40.713" data-lng="-74.006">New York</button>
+            <button class="city-btn" data-lat="35.689" data-lng="139.692">Tokyo</button>
+            <button class="city-btn" data-lat="-33.868" data-lng="151.209">Sydney</button>
+            <button class="city-btn" data-lat="55.755" data-lng="37.617">Moscow</button>
+            <button class="city-btn" data-lat="-1.292" data-lng="36.821">Nairobi</button>
+            <button class="city-btn" data-lat="-23.55" data-lng="-46.633">São Paulo</button>
+          </div>
+        </div>
+      </div>
+    </aside>
 
-            // Real-time calculation loop (Ticks once per second)
-            setInterval(() => {
-                if(window.currentLat && window.currentLon) {
-                    runPrecisionUpdate(window.currentLat, window.currentLon);
-                } else {
-                    runPrecisionUpdate(DEFAULT_LAT, DEFAULT_LON);
-                }
-            }, 1000);
+    <!-- RIGHT CONTENT -->
+    <div>
+      <!-- DATA STRIP -->
+      <div class="data-row">
+        <div class="data-card">
+          <div class="dk">Azimuth</div>
+          <div class="dv" id="dAz">—</div>
+          <div class="du">degrees °</div>
+        </div>
+        <div class="data-card">
+          <div class="dk">Altitude</div>
+          <div class="dv" id="dAlt">—</div>
+          <div class="du">degrees °</div>
+        </div>
+        <div class="data-card">
+          <div class="dk">Visibility</div>
+          <div class="dv" id="dVis" style="font-size:20px;padding-top:8px">—</div>
+          <div class="du" id="dVisLbl"></div>
+        </div>
+        <div class="data-card">
+          <div class="dk">Lunar phase</div>
+          <div class="dv" id="dPhase" style="font-size:20px;padding-top:8px">—</div>
+          <div class="du" id="dPhaseLbl"></div>
+        </div>
+      </div>
 
-            if (window.DeviceOrientationEvent) {
-                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    document.body.addEventListener('click', () => {
-                        DeviceOrientationEvent.requestPermission()
-                            .then(response => { if (response === 'granted') listenToCompass(); })
-                            .catch(console.error);
-                    }, { once: true });
-                } else {
-                    listenToCompass();
-                }
-            }
-        });
+      <!-- VISUALIZATIONS -->
+      <div class="viz-row">
+        <div class="viz-panel">
+          <div class="viz-label">
+            <div class="viz-label-diamond"></div>
+            Compass
+          </div>
+          <div class="viz-sub">Azimuth · top-down view · 0–360°</div>
+          <canvas id="compass" width="380" height="380"></canvas>
+        </div>
+        <div class="viz-panel">
+          <div class="viz-label">
+            <div class="viz-label-diamond"></div>
+            Horizon
+          </div>
+          <div class="viz-sub">Altitude · profile view · −90° to +90°</div>
+          <canvas id="horizon" width="380" height="300"></canvas>
+        </div>
+      </div>
 
-        function listenToCompass() {
-            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-            window.addEventListener('deviceorientation', handleOrientation, true);
-        }
+      <!-- STATUS -->
+      <div class="status-bar">
+        <div>
+          <span class="pulse"></span>
+          Lat <span id="sbLat">—</span> &ensp;·&ensp; Lng <span id="sbLng">—</span> &ensp;·&ensp; UTC <span id="sbTime">—</span>
+        </div>
+        <div>Lunara · Universal Moon Position Locator</div>
+      </div>
+    </div>
+  </main>
+</div>
 
-        function handleOrientation(event) {
-            let heading = event.webkitCompassHeading || event.alpha;
-            if (event.absolute === false && event.webkitCompassHeading === undefined) return;
-            
-            if (heading !== null && heading !== undefined) {
-                const compassFrame = document.getElementById('compass-hardware-frame');
-                compassFrame.style.transform = `rotate(${-heading}deg)`;
-            }
-        }
+<script>
+const DEG=Math.PI/180, RAD=180/Math.PI;
 
-        function runPrecisionUpdate(lat, lon) {
-            window.currentLat = lat;
-            window.currentLon = lon;
+function toJD(ms){return ms/86400000+2440587.5}
 
-            const now = new Date();
-            const utTime = now.getTime();
-            const d = (utTime / 86400000) + 2440587.5 - 2451545.0;
-            const T = d / 36525;
+function moonPosition(lat,lng,date){
+  const JD=toJD(date.getTime());
+  const T=(JD-2451545)/36525;
+  let L0=218.3164477+481267.88123421*T;
+  let M=357.5291092+35999.0502909*T;
+  let Mm=134.9633964+477198.8675055*T;
+  let D=297.8501921+445267.1114034*T;
+  let F=93.2720950+483202.0175233*T;
+  [L0,M,Mm,D,F]=[L0,M,Mm,D,F].map(v=>((v%360)+360)%360);
+  const dL=6288774*Math.sin(Mm*DEG)+1274027*Math.sin((2*D-Mm)*DEG)+658314*Math.sin(2*D*DEG)-185116*Math.sin(M*DEG)-114332*Math.sin(2*F*DEG)+58793*Math.sin((2*D-2*Mm)*DEG)+53322*Math.sin((2*D+Mm)*DEG)+45758*Math.sin((2*D-M)*DEG)-40923*Math.sin((Mm-M)*DEG)-34720*Math.sin(D*DEG)+15327*Math.sin((2*D-2*F)*DEG);
+  const dB=5128122*Math.sin(F*DEG)+280602*Math.sin((Mm+F)*DEG)+277693*Math.sin((Mm-F)*DEG)+173237*Math.sin((2*D-F)*DEG)+55413*Math.sin((2*D-Mm+F)*DEG)+46271*Math.sin((2*D-Mm-F)*DEG);
+  const mLon=((L0+dL/1e6)%360+360)%360, mLat=dB/1e6;
+  const eps=23.439291111-0.013004167*T;
+  const RA_r=Math.atan2(Math.sin(mLon*DEG)*Math.cos(eps*DEG)-Math.tan(mLat*DEG)*Math.sin(eps*DEG),Math.cos(mLon*DEG));
+  const Dec_r=Math.asin(Math.sin(mLat*DEG)*Math.cos(eps*DEG)+Math.cos(mLat*DEG)*Math.sin(eps*DEG)*Math.sin(mLon*DEG));
+  const RA=((RA_r*RAD)+360)%360, Dec=Dec_r*RAD;
+  const GMST=((280.46061837+360.98564736629*(JD-2451545))%360+360)%360;
+  const LST=((GMST+lng)%360+360)%360;
+  const HA=((LST-RA)%360+360)%360;
+  const sinAlt=Math.sin(lat*DEG)*Math.sin(Dec*DEG)+Math.cos(lat*DEG)*Math.cos(Dec*DEG)*Math.cos(HA*DEG);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)))*RAD;
+  const ca=Math.cos(alt*DEG)||1e-9;
+  const cosAz=(Math.sin(Dec*DEG)-Math.sin(lat*DEG)*sinAlt)/(Math.cos(lat*DEG)*ca);
+  const sinAz=-Math.cos(Dec*DEG)*Math.sin(HA*DEG)/ca;
+  const az=((Math.atan2(sinAz,cosAz)*RAD)+360)%360;
+  const phase=(1-Math.cos(((D%360+360)%360)*DEG))/2;
+  return{az,alt,phase};
+}
 
-            const rad = Math.PI / 180;
-            
-            const L1 = 218.316 + 13.176396 * d;
-            const M = 134.963 + 13.064993 * d;
-            const F = 93.272 + 13.229350 * d;
-            const D = 297.850 + 12.190749 * d;
+function phaseLabel(p){return['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Third Quarter','Waning Crescent'][Math.round(p*8)%8]}
+function phaseEmoji(p){return['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'][Math.round(p*8)%8]}
 
-            let eclLon = L1 + 6.289 * Math.sin(M * rad) + 1.274 * Math.sin((2*D - M) * rad) + 0.658 * Math.sin(2*D * rad) + 0.214 * Math.sin(2*M * rad);
-            let eclLat = 5.128 * Math.sin(F * rad) + 0.280 * Math.sin((M + F) * rad) + 0.287 * Math.sin((M - F) * rad);
-            
-            let distanceKm = 385001 - 20905 * Math.cos(M * rad) - 3699 * Math.cos((2*D - M) * rad);
+function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
 
-            const obliq = (23.439291 - 0.0130042 * T) * rad;
-            eclLon = (eclLon % 360 + 360) % 360 * rad;
-            eclLat *= rad;
+function drawCompass(az){
+  const c=document.getElementById('compass');
+  const ctx=c.getContext('2d');
+  const W=c.width,H=c.height,cx=W/2,cy=H/2,R=Math.min(W,H)*0.43;
+  ctx.clearRect(0,0,W,H);
 
-            const ra = Math.atan2(Math.sin(eclLon) * Math.cos(obliq) - Math.tan(eclLat) * Math.sin(obliq), Math.cos(eclLon));
-            const dec = Math.asin(Math.sin(eclLat) * Math.cos(obliq) + Math.cos(eclLat) * Math.sin(obliq) * Math.sin(eclLon));
+  const isDark=document.documentElement.dataset.mode==='dark';
+  const ringCol=isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)';
+  const tickCol=isDark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.18)';
+  const labelCol=isDark?'rgba(255,255,255,0.35)':'rgba(0,0,0,0.35)';
+  const accentCol=isDark?'#7eb87a':'#4a8c44';
+  const moonCol=isDark?'rgba(255,255,255,0.9)':'rgba(22,30,18,0.85)';
+  const moonRing=isDark?'rgba(255,255,255,0.5)':'rgba(22,30,18,0.4)';
+  const textPrimary=isDark?'rgba(255,255,255,0.9)':'rgba(22,30,18,0.9)';
+  const northRed=isDark?'#e07070':'#c04040';
 
-            const gst = (280.46061837 + 360.98564736629 * d) % 360;
-            const lst = ((gst + lon) * rad);
-            const ha = lst - ra;
+  // Rings
+  [1,0.72,0.45].forEach((s,i)=>{
+    ctx.beginPath();ctx.arc(cx,cy,R*s,0,Math.PI*2);
+    ctx.strokeStyle=ringCol;ctx.lineWidth=i===0?1:0.5;ctx.stroke();
+  });
 
-            const latRad = lat * rad;
-            
-            let sin_alt = Math.sin(latRad) * Math.sin(dec) + Math.cos(latRad) * Math.cos(dec) * Math.cos(ha);
-            let alt = Math.asin(sin_alt);
-            
-            let cos_az = (Math.sin(dec) - Math.sin(latRad) * sin_alt) / (Math.cos(latRad) * Math.cos(alt));
-            let sin_az = -Math.sin(ha) * Math.cos(dec) / Math.cos(alt);
-            
-            let az = Math.atan2(sin_az, cos_az) / rad;
-            targetTrueBearing = (az + 360) % 360;
-            alt = alt / rad;
+  // Ticks
+  for(let i=0;i<360;i+=5){
+    const a=(i-90)*DEG;
+    const isMaj=i%45===0,isMid=i%15===0;
+    const inner=isMaj?0.84:isMid?0.90:0.94;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*R*inner,cy+Math.sin(a)*R*inner);
+    ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);
+    ctx.strokeStyle=isMaj?tickCol+'cc':tickCol+'55';
+    ctx.lineWidth=isMaj?1:0.4;ctx.stroke();
+  }
 
-            const moonNode = document.getElementById('moon-indicator');
-            const compassRadius = 118; 
-            const uiAngle = (targetTrueBearing - 90) * rad;
-            
-            moonNode.style.left = `calc(50% - 18px + ${Math.cos(uiAngle) * compassRadius}px)`;
-            moonNode.style.top = `calc(50% - 18px + ${Math.sin(uiAngle) * compassRadius}px)`;
-            
-            const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14); 
-            const synodicMonth = 29.530588853; 
-            const ageInDays = ((now.getTime() - knownNewMoon) / 86400000) % synodicMonth;
-            
-            let phaseString = "";
-            let phaseEmoji = "🌕";
+  // Degree labels
+  ctx.font=`10px Inter`;ctx.textAlign='center';ctx.textBaseline='middle';
+  for(let d=0;d<360;d+=30){
+    const a=(d-90)*DEG,rr=R*0.62;
+    ctx.fillStyle=labelCol;
+    ctx.fillText(d+'°',cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);
+  }
 
-            if (ageInDays < 1.84) { phaseString = "New Moon"; phaseEmoji = "🌑"; }
-            else if (ageInDays < 5.54) { phaseString = "Waxing Crescent"; phaseEmoji = "🌒"; }
-            else if (ageInDays < 9.23) { phaseString = "First Quarter"; phaseEmoji = "🌓"; }
-            else if (ageInDays < 12.92) { phaseString = "Waxing Gibbous"; phaseEmoji = "🌔"; }
-            else if (ageInDays < 16.61) { phaseString = "Full Moon"; phaseEmoji = "🌕"; }
-            else if (ageInDays < 20.30) { phaseString = "Waning Gibbous"; phaseEmoji = "🌖"; }
-            else if (ageInDays < 23.99) { phaseString = "Last Quarter"; phaseEmoji = "🌗"; }
-            else if (ageInDays < 27.68) { phaseString = "Waning Crescent"; phaseEmoji = "🌘"; }
-            else { phaseString = "New Moon"; phaseEmoji = "🌑"; }
+  // Cardinals
+  const cards=[['N',0],['E',90],['S',180],['W',270]];
+  ctx.font=`500 11px Inter`;
+  cards.forEach(([l,d])=>{
+    const a=(d-90)*DEG;
+    ctx.fillStyle=l==='N'?northRed:textPrimary;
+    ctx.fillText(l,cx+Math.cos(a)*(R+18),cy+Math.sin(a)*(R+18));
+  });
 
-            if (alt < 0) {
-                moonNode.innerText = phaseEmoji;
-                moonNode.style.opacity = "0.2";
-                document.getElementById('val-altitude').innerText = `${alt.toFixed(1)}° (Below Horizon)`;
-            } else {
-                moonNode.innerText = phaseEmoji;
-                moonNode.style.opacity = "1";
-                document.getElementById('val-altitude').innerText = `${alt.toFixed(1)}°`;
-            }
-            
-            document.getElementById('val-azimuth').innerText = `${targetTrueBearing.toFixed(1)}°`;
-            document.getElementById('val-phase').innerText = phaseString;
-            document.getElementById('val-distance').innerText = `${Math.round(distanceKm).toLocaleString()} km`;
-        }
+  // Moon sweep line
+  const ma=(az-90)*DEG,mr=R*0.76;
+  const mx=cx+Math.cos(ma)*mr,my=cy+Math.sin(ma)*mr;
+  ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(mx,my);
+  ctx.strokeStyle=accentCol+'44';ctx.lineWidth=1;
+  ctx.setLineDash([3,5]);ctx.stroke();ctx.setLineDash([]);
 
-        function initStars() {
-            const canvas = document.getElementById('star-canvas');
-            const ctx = canvas.getContext('2d');
-            let stars = [];
-            
-            function resize() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-            window.addEventListener('resize', resize);
-            resize();
+  // Moon glow
+  const grd=ctx.createRadialGradient(mx,my,0,mx,my,24);
+  grd.addColorStop(0,accentCol+'22');grd.addColorStop(1,'transparent');
+  ctx.beginPath();ctx.arc(mx,my,24,0,Math.PI*2);ctx.fillStyle=grd;ctx.fill();
 
-            for (let i = 0; i < 140; i++) {
-                stars.push({
-                    x: Math.random() * window.innerWidth,
-                    y: Math.random() * window.innerHeight,
-                    radius: Math.random() * 1.2,
-                    alpha: Math.random(),
-                    speed: 0.006 + Math.random() * 0.012
-                });
-            }
+  // Moon mark (diamond)
+  ctx.save();ctx.translate(mx,my);ctx.rotate(Math.PI/4);
+  ctx.beginPath();ctx.rect(-8,-8,16,16);
+  ctx.fillStyle=isDark?'rgba(14,26,16,0.9)':'rgba(235,230,218,0.9)';
+  ctx.strokeStyle=moonCol;ctx.lineWidth=1.5;
+  ctx.fill();ctx.stroke();ctx.restore();
 
-            function animate() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                stars.forEach(star => {
-                    star.alpha += star.speed;
-                    if (star.alpha > 1 || star.alpha < 0) star.speed = -star.speed;
-                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, star.alpha)})`;
-                    ctx.beginPath();
-                    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-                    ctx.fill();
-                });
-                requestAnimationFrame(animate);
-            }
-            animate();
-        }
-    </script>
+  // Inner diamond mark
+  ctx.save();ctx.translate(mx,my);ctx.rotate(Math.PI/4);
+  ctx.beginPath();ctx.rect(-3.5,-3.5,7,7);
+  ctx.fillStyle=moonCol;ctx.fill();ctx.restore();
+
+  // Center
+  ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);
+  ctx.fillStyle=isDark?'rgba(255,255,255,0.3)':'rgba(0,0,0,0.2)';ctx.fill();
+
+  // Az label
+  ctx.font='10px Inter';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle=labelCol;
+  ctx.fillText(Math.round(az)+'°',cx,H-14);
+}
+
+function drawHorizon(alt){
+  const c=document.getElementById('horizon');
+  const ctx=c.getContext('2d');
+  const W=c.width,H=c.height,cx=W/2,gY=H*0.6;
+  ctx.clearRect(0,0,W,H);
+
+  const isDark=document.documentElement.dataset.mode==='dark';
+  const abv=alt>=0;
+  const accentCol=isDark?'#7eb87a':'#4a8c44';
+  const belowCol=isDark?'#c07a4a':'#9b5a28';
+  const labelCol=isDark?'rgba(255,255,255,0.28)':'rgba(0,0,0,0.28)';
+  const lineCol=isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)';
+  const horizonCol=isDark?'rgba(255,255,255,0.2)':'rgba(0,0,0,0.2)';
+  const moonColor=abv?accentCol:belowCol;
+
+  // Sky tint
+  if(abv){
+    const skyH=gY*(alt/90);
+    ctx.fillStyle=isDark?'rgba(126,184,122,0.04)':'rgba(74,140,68,0.04)';
+    ctx.fillRect(0,gY-skyH,W,skyH);
+  }
+  // Ground
+  ctx.fillStyle=isDark?'rgba(20,38,14,0.35)':'rgba(50,38,18,0.06)';
+  ctx.fillRect(0,gY,W,H-gY);
+
+  // Grid lines
+  for(let d=-60;d<=90;d+=30){
+    const yy=gY-(d/90)*(gY-20);
+    ctx.strokeStyle=d===0?horizonCol:lineCol;
+    ctx.lineWidth=d===0?1:0.5;
+    ctx.setLineDash(d===0?[]:[3,6]);
+    ctx.beginPath();ctx.moveTo(24,yy);ctx.lineTo(W-24,yy);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=labelCol;
+    ctx.font='9px Inter';ctx.textAlign='right';
+    ctx.fillText(d+'°',20,yy+3);
+  }
+
+  // Horizon label
+  ctx.fillStyle=horizonCol;ctx.font='9px Inter';
+  ctx.textAlign='left';
+  ctx.fillText('Horizon',26,gY-6);
+
+  // Arc
+  const arcR=W*0.38;
+  ctx.beginPath();ctx.arc(cx,gY,arcR,Math.PI,0);
+  ctx.strokeStyle=lineCol;ctx.lineWidth=0.5;ctx.stroke();
+
+  // Moon
+  const cl=Math.max(-85,Math.min(85,alt));
+  const mY=gY-(cl/90)*(gY-20);
+
+  ctx.beginPath();ctx.moveTo(cx,gY);ctx.lineTo(cx,mY);
+  ctx.strokeStyle=moonColor+'33';ctx.lineWidth=1;
+  ctx.setLineDash([2,5]);ctx.stroke();ctx.setLineDash([]);
+
+  // Glow
+  const grd2=ctx.createRadialGradient(cx,mY,0,cx,mY,26);
+  grd2.addColorStop(0,moonColor+'25');grd2.addColorStop(1,'transparent');
+  ctx.beginPath();ctx.arc(cx,mY,26,0,Math.PI*2);ctx.fillStyle=grd2;ctx.fill();
+
+  // Moon diamond
+  ctx.save();ctx.translate(cx,mY);ctx.rotate(Math.PI/4);
+  ctx.beginPath();ctx.rect(-10,-10,20,20);
+  ctx.fillStyle=isDark?'rgba(14,26,16,0.9)':'rgba(235,230,218,0.9)';
+  ctx.strokeStyle=moonColor;ctx.lineWidth=1.5;
+  ctx.fill();ctx.stroke();ctx.restore();
+
+  ctx.save();ctx.translate(cx,mY);ctx.rotate(Math.PI/4);
+  ctx.beginPath();ctx.rect(-4,-4,8,8);
+  ctx.fillStyle=moonColor;ctx.fill();ctx.restore();
+
+  // Alt label
+  const sign=alt>=0?'+':'';
+  ctx.fillStyle=moonColor+'99';ctx.font='10px Inter';
+  ctx.textAlign='center';
+  ctx.fillText(sign+Math.round(alt)+'°',cx+44,mY+(abv?-14:14));
+}
+
+let lat=26.84,lng=80.94;
+
+function getDate(){
+  const d=document.getElementById('dateInput').value;
+  const t=parseFloat(document.getElementById('timeSlider').value);
+  const h=Math.floor(t),m=Math.round((t-h)*60);
+  const b=d?new Date(d+'T00:00:00Z'):new Date();
+  if(d)b.setUTCHours(h,m,0,0);
+  return b;
+}
+
+function update(){
+  const date=getDate();
+  const r=moonPosition(lat,lng,date);
+  const az=((r.az%360)+360)%360;
+  const alt=r.alt,abv=alt>=0;
+
+  document.getElementById('dAz').textContent=Math.round(az);
+  const dAlt=document.getElementById('dAlt');
+  dAlt.textContent=(alt>=0?'+':'')+Math.round(alt);
+  dAlt.className='dv '+(abv?'above':'below');
+
+  const dv=document.getElementById('dVis');
+  dv.textContent=abv?'Above':'Below';
+  dv.className='dv '+(abv?'above':'below');
+  document.getElementById('dVisLbl').textContent='the horizon';
+
+  document.getElementById('dPhase').textContent=phaseEmoji(r.phase);
+  document.getElementById('dPhaseLbl').textContent=phaseLabel(r.phase);
+
+  const heroWords=['Moon','Cosmos','Sky','Lunar','Night','Stars','Orbit'];
+  document.getElementById('heroWord').textContent=abv?'Above':'Below';
+
+  const ep=date.toUTCString().replace(' GMT',' UTC');
+  document.getElementById('sbLat').textContent=lat.toFixed(4)+'°';
+  document.getElementById('sbLng').textContent=lng.toFixed(4)+'°';
+  document.getElementById('sbTime').textContent=ep;
+
+  drawCompass(az);drawHorizon(alt);
+}
+
+function setCoords(la,lo){
+  lat=la;lng=lo;
+  document.getElementById('latSlider').value=la;
+  document.getElementById('lngSlider').value=lo;
+  document.getElementById('latNum').value=parseFloat(la).toFixed(4);
+  document.getElementById('lngNum').value=parseFloat(lo).toFixed(4);
+  document.getElementById('latVal').textContent=parseFloat(la).toFixed(2)+'°';
+  document.getElementById('lngVal').textContent=parseFloat(lo).toFixed(2)+'°';
+  update();
+}
+
+// Sliders
+document.getElementById('latSlider').oninput=e=>{lat=parseFloat(e.target.value);document.getElementById('latVal').textContent=lat.toFixed(2)+'°';document.getElementById('latNum').value=lat.toFixed(4);update();};
+document.getElementById('lngSlider').oninput=e=>{lng=parseFloat(e.target.value);document.getElementById('lngVal').textContent=lng.toFixed(2)+'°';document.getElementById('lngNum').value=lng.toFixed(4);update();};
+document.getElementById('latNum').oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)&&v>=-90&&v<=90){lat=v;document.getElementById('latSlider').value=v;document.getElementById('latVal').textContent=v.toFixed(2)+'°';update();}};
+document.getElementById('lngNum').oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)&&v>=-180&&v<=180){lng=v;document.getElementById('lngSlider').value=v;document.getElementById('lngVal').textContent=v.toFixed(2)+'°';update();}};
+document.getElementById('timeSlider').oninput=e=>{const t=parseFloat(e.target.value),h=Math.floor(t),m=Math.round((t-h)*60);document.getElementById('timeVal').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');update();};
+document.getElementById('dateInput').onchange=update;
+
+// Cities
+document.querySelectorAll('.city-btn').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.city-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    setCoords(parseFloat(b.dataset.lat),parseFloat(b.dataset.lng));
+  };
+});
+
+// Geo
+document.getElementById('geoBtn').onclick=()=>{
+  if(!navigator.geolocation){document.getElementById('geoStatus').textContent='Geolocation not supported';return;}
+  document.getElementById('geoStatus').textContent='Acquiring signal…';
+  navigator.geolocation.getCurrentPosition(
+    p=>{setCoords(p.coords.latitude,p.coords.longitude);document.getElementById('geoStatus').textContent='Located — ±'+Math.round(p.coords.accuracy)+'m accuracy';document.querySelectorAll('.city-btn').forEach(x=>x.classList.remove('active'));},
+    ()=>{document.getElementById('geoStatus').textContent='Permission denied — using default location';update();},
+    {timeout:8000,maximumAge:60000}
+  );
+};
+
+// Dark/Light toggle
+document.getElementById('modeBtn').onclick=()=>{
+  const html=document.documentElement;
+  const isDark=html.dataset.mode==='dark';
+  html.dataset.mode=isDark?'light':'dark';
+  document.getElementById('modeIcon').textContent=isDark?'🌙':'☀';
+  document.getElementById('modeLabel').textContent=isDark?'Dark':'Light';
+  update();
+};
+
+// Init
+const now=new Date();
+document.getElementById('dateInput').value=now.toISOString().split('T')[0];
+const h0=now.getUTCHours()+now.getUTCMinutes()/60;
+document.getElementById('timeSlider').value=h0;
+const hh=Math.floor(h0),mm=Math.round((h0-hh)*60);
+document.getElementById('timeVal').textContent=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(
+    p=>{setCoords(p.coords.latitude,p.coords.longitude);document.getElementById('geoStatus').textContent='Located — ±'+Math.round(p.coords.accuracy)+'m accuracy';document.querySelectorAll('.city-btn').forEach(x=>x.classList.remove('active'));},
+    ()=>update(),{timeout:5000}
+  );
+}else{update();}
+</script>
 </body>
 </html>
