@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUNAR HUD v5.5</title>
+    <style>
+        :root {
+            --pure-black: #000000;
+            --dark-gray: #0b0b0d;
+            --hud-overlay: rgba(5, 5, 5, 0.95);
+            --neon-red: #ff4a4a;
+            --neon-green: #00ff66;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--pure-black);
+            color: #ffffff;
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        #star-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        header {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            box-sizing: border-box;
+            z-index: 100;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            letter-spacing: 5px;
+            color: #ffffff;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        }
+
+        #status-text {
+            font-size: 0.75rem;
+            color: var(--neon-green);
+            margin-top: 8px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #viewport-container {
+            position: relative;
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #compass-hardware-frame {
+            position: relative;
+            width: 290px;
+            height: 290px;
+            background: rgba(11, 11, 13, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0,0,0,1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease-out; 
+            backdrop-filter: blur(4px);
+        }
+
+        #inner-ticks {
+            position: absolute;
+            width: 85%;
+            height: 85%;
+            border: 1px dashed rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+        }
+
+        .cardinal {
+            position: absolute;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.95rem;
+        }
+        .north { top: 12px; color: var(--neon-red); text-shadow: 0 0 5px var(--neon-red); }
+        .east { right: 12px; }
+        .south { bottom: 12px; }
+        .west { left: 12px; }
+
+        #moon-indicator {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            font-size: 30px;
+            line-height: 36px;
+            text-align: center;
+            z-index: 50;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.7));
+            pointer-events: none;
+        }
+
+        #hud-panel {
+            width: calc(100% - 40px);
+            max-width: 450px;
+            background: var(--hud-overlay);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 25px;
+            box-sizing: border-box;
+            z-index: 90;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .telemetry-block {
+            border-left: 1px solid rgba(255, 255, 255, 0.15);
+            padding-left: 12px;
+        }
+
+        .label {
+            font-size: 0.65rem;
+            color: #55555c;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .value {
+            font-size: 1.05rem;
+            color: #ffffff;
+            font-weight: bold;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="star-canvas"></canvas>
+
+    <header>
+        <h1>LUNAR MATRIX LINK</h1>
+        <div id="status-text">RUNNING COMPUTE...</div>
+    </header>
+
+    <div id="viewport-container">
+        <div id="compass-hardware-frame">
+            <div id="inner-ticks"></div>
+            <div class="cardinal north">N</div>
+            <div class="cardinal east">E</div>
+            <div class="cardinal south">S</div>
+            <div class="cardinal west">W</div>
+            <div id="moon-indicator">🌑</div>
+        </div>
+    </div>
+
+    <div id="hud-panel">
+        <div class="grid">
+            <div class="telemetry-block">
+                <div class="label">Bearing (Azimuth)</div>
+                <div id="val-azimuth" class="value">0.0°</div>
+            </div>
+            <div class="telemetry-block">
+                <div class="label">Elevation (Altitude)</div>
+                <div id="val-altitude" class="value">0.0°</div>
+            </div>
+            <div class="telemetry-block">
+                <div class="label">Current Phase</div>
+                <div id="val-phase" class="value">Calculating...</div>
+            </div>
+            <div class="telemetry-block">
+                <div class="label">Orbital Distance</div>
+                <div id="val-distance" class="value">---,--- km</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let targetTrueBearing = 0;
+        
+        // Fail-safe default spatial metrics for Lucknow, India
+        const DEFAULT_LAT = 26.8467;
+        const DEFAULT_LON = 80.9462;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initStars();
+            
+            // Execute fallback instantly so UI isn't stuck waiting for Geolocation response
+            runPrecisionUpdate(DEFAULT_LAT, DEFAULT_LON);
+            document.getElementById('status-text').innerText = "CORE ACTIVE // USING LUCKNOW METRICS";
+
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        document.getElementById('status-text').innerText = "CORE ACTIVE // HARDWARE GPS SYNC";
+                        runPrecisionUpdate(position.coords.latitude, position.coords.longitude);
+                    },
+                    (error) => {
+                        // Fail silently and keep using default parameters
+                        console.log("GPS Denied, utilizing localized default coordinates.");
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            }
+
+            // Real-time calculation loop (Ticks once per second)
+            setInterval(() => {
+                if(window.currentLat && window.currentLon) {
+                    runPrecisionUpdate(window.currentLat, window.currentLon);
+                } else {
+                    runPrecisionUpdate(DEFAULT_LAT, DEFAULT_LON);
+                }
+            }, 1000);
+
+            if (window.DeviceOrientationEvent) {
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    document.body.addEventListener('click', () => {
+                        DeviceOrientationEvent.requestPermission()
+                            .then(response => { if (response === 'granted') listenToCompass(); })
+                            .catch(console.error);
+                    }, { once: true });
+                } else {
+                    listenToCompass();
+                }
+            }
+        });
+
+        function listenToCompass() {
+            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+            window.addEventListener('deviceorientation', handleOrientation, true);
+        }
+
+        function handleOrientation(event) {
+            let heading = event.webkitCompassHeading || event.alpha;
+            if (event.absolute === false && event.webkitCompassHeading === undefined) return;
+            
+            if (heading !== null && heading !== undefined) {
+                const compassFrame = document.getElementById('compass-hardware-frame');
+                compassFrame.style.transform = `rotate(${-heading}deg)`;
+            }
+        }
+
+        function runPrecisionUpdate(lat, lon) {
+            window.currentLat = lat;
+            window.currentLon = lon;
+
+            const now = new Date();
+            const utTime = now.getTime();
+            const d = (utTime / 86400000) + 2440587.5 - 2451545.0;
+            const T = d / 36525;
+
+            const rad = Math.PI / 180;
+            
+            const L1 = 218.316 + 13.176396 * d;
+            const M = 134.963 + 13.064993 * d;
+            const F = 93.272 + 13.229350 * d;
+            const D = 297.850 + 12.190749 * d;
+
+            let eclLon = L1 + 6.289 * Math.sin(M * rad) + 1.274 * Math.sin((2*D - M) * rad) + 0.658 * Math.sin(2*D * rad) + 0.214 * Math.sin(2*M * rad);
+            let eclLat = 5.128 * Math.sin(F * rad) + 0.280 * Math.sin((M + F) * rad) + 0.287 * Math.sin((M - F) * rad);
+            
+            let distanceKm = 385001 - 20905 * Math.cos(M * rad) - 3699 * Math.cos((2*D - M) * rad);
+
+            const obliq = (23.439291 - 0.0130042 * T) * rad;
+            eclLon = (eclLon % 360 + 360) % 360 * rad;
+            eclLat *= rad;
+
+            const ra = Math.atan2(Math.sin(eclLon) * Math.cos(obliq) - Math.tan(eclLat) * Math.sin(obliq), Math.cos(eclLon));
+            const dec = Math.asin(Math.sin(eclLat) * Math.cos(obliq) + Math.cos(eclLat) * Math.sin(obliq) * Math.sin(eclLon));
+
+            const gst = (280.46061837 + 360.98564736629 * d) % 360;
+            const lst = ((gst + lon) * rad);
+            const ha = lst - ra;
+
+            const latRad = lat * rad;
+            
+            let sin_alt = Math.sin(latRad) * Math.sin(dec) + Math.cos(latRad) * Math.cos(dec) * Math.cos(ha);
+            let alt = Math.asin(sin_alt);
+            
+            let cos_az = (Math.sin(dec) - Math.sin(latRad) * sin_alt) / (Math.cos(latRad) * Math.cos(alt));
+            let sin_az = -Math.sin(ha) * Math.cos(dec) / Math.cos(alt);
+            
+            let az = Math.atan2(sin_az, cos_az) / rad;
+            targetTrueBearing = (az + 360) % 360;
+            alt = alt / rad;
+
+            const moonNode = document.getElementById('moon-indicator');
+            const compassRadius = 118; 
+            const uiAngle = (targetTrueBearing - 90) * rad;
+            
+            moonNode.style.left = `calc(50% - 18px + ${Math.cos(uiAngle) * compassRadius}px)`;
+            moonNode.style.top = `calc(50% - 18px + ${Math.sin(uiAngle) * compassRadius}px)`;
+            
+            const knownNewMoon = Date.UTC(2000, 0, 6, 18, 14); 
+            const synodicMonth = 29.530588853; 
+            const ageInDays = ((now.getTime() - knownNewMoon) / 86400000) % synodicMonth;
+            
+            let phaseString = "";
+            let phaseEmoji = "🌕";
+
+            if (ageInDays < 1.84) { phaseString = "New Moon"; phaseEmoji = "🌑"; }
+            else if (ageInDays < 5.54) { phaseString = "Waxing Crescent"; phaseEmoji = "🌒"; }
+            else if (ageInDays < 9.23) { phaseString = "First Quarter"; phaseEmoji = "🌓"; }
+            else if (ageInDays < 12.92) { phaseString = "Waxing Gibbous"; phaseEmoji = "🌔"; }
+            else if (ageInDays < 16.61) { phaseString = "Full Moon"; phaseEmoji = "🌕"; }
+            else if (ageInDays < 20.30) { phaseString = "Waning Gibbous"; phaseEmoji = "🌖"; }
+            else if (ageInDays < 23.99) { phaseString = "Last Quarter"; phaseEmoji = "🌗"; }
+            else if (ageInDays < 27.68) { phaseString = "Waning Crescent"; phaseEmoji = "🌘"; }
+            else { phaseString = "New Moon"; phaseEmoji = "🌑"; }
+
+            if (alt < 0) {
+                moonNode.innerText = phaseEmoji;
+                moonNode.style.opacity = "0.2";
+                document.getElementById('val-altitude').innerText = `${alt.toFixed(1)}° (Below Horizon)`;
+            } else {
+                moonNode.innerText = phaseEmoji;
+                moonNode.style.opacity = "1";
+                document.getElementById('val-altitude').innerText = `${alt.toFixed(1)}°`;
+            }
+            
+            document.getElementById('val-azimuth').innerText = `${targetTrueBearing.toFixed(1)}°`;
+            document.getElementById('val-phase').innerText = phaseString;
+            document.getElementById('val-distance').innerText = `${Math.round(distanceKm).toLocaleString()} km`;
+        }
+
+        function initStars() {
+            const canvas = document.getElementById('star-canvas');
+            const ctx = canvas.getContext('2d');
+            let stars = [];
+            
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            for (let i = 0; i < 140; i++) {
+                stars.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    radius: Math.random() * 1.2,
+                    alpha: Math.random(),
+                    speed: 0.006 + Math.random() * 0.012
+                });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                stars.forEach(star => {
+                    star.alpha += star.speed;
+                    if (star.alpha > 1 || star.alpha < 0) star.speed = -star.speed;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, star.alpha)})`;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+    </script>
+</body>
+</html>
